@@ -9,8 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import {
-  predictGrowth,
-  matchInvestors,
   SECTORS,
   STAGES,
   LOCATIONS,
@@ -134,10 +132,25 @@ export default function StartupDashboard() {
       teamSize: Number(teamSize),
     }
 
-    const prediction = await predictGrowth(input)
-    setResult(prediction)
-    const matches = await matchInvestors(input)
-    setInvestors(matches)
+    try {
+      const predRes = await fetch("/api/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+      const prediction: PredictionResult = await predRes.json()
+      setResult(prediction)
+
+      const matchRes = await fetch("/api/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+      const { investors: matches }: { investors: InvestorMatch[] } = await matchRes.json()
+      setInvestors(matches)
+    } catch {
+      // handle error gracefully
+    }
     setLoading(false)
   }
 

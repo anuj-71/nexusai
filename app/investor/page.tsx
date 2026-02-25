@@ -1,24 +1,30 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { getStartups, SECTORS, STAGES, LOCATIONS, type StartupResult } from "@/lib/mock-data"
+import { SECTORS, STAGES, LOCATIONS, type StartupResult } from "@/lib/mock-data"
 import {
   ArrowDownUp,
   Brain,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   DollarSign,
   Filter,
+  Loader2,
   MapPin,
   Sparkles,
   TrendingUp,
   Users,
   X,
 } from "lucide-react"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 function StartupCard({ startup }: { startup: StartupResult }) {
   return (
@@ -96,20 +102,37 @@ function StartupCard({ startup }: { startup: StartupResult }) {
 type SortKey = "matchScore" | "growthScore" | "growthRate"
 
 export default function InvestorDashboard() {
-  const allStartups = useMemo(() => getStartups(), [])
   const [sectorFilter, setSectorFilter] = useState<string>("all")
   const [stageFilter, setStageFilter] = useState<string>("all")
   const [locationFilter, setLocationFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<SortKey>("matchScore")
+  const [page, setPage] = useState(1)
 
-  const filteredStartups = useMemo(() => {
-    let filtered = [...allStartups]
-    if (sectorFilter !== "all") filtered = filtered.filter((s) => s.sector === sectorFilter)
-    if (stageFilter !== "all") filtered = filtered.filter((s) => s.stage === stageFilter)
-    if (locationFilter !== "all") filtered = filtered.filter((s) => s.location === locationFilter)
-    filtered.sort((a, b) => b[sortBy] - a[sortBy])
-    return filtered
-  }, [allStartups, sectorFilter, stageFilter, locationFilter, sortBy])
+  const params = new URLSearchParams({
+    sector: sectorFilter,
+    stage: stageFilter,
+    location: locationFilter,
+    sortBy,
+    page: String(page),
+    perPage: "30",
+  })
+
+  const { data, isLoading } = useSWR<{
+    startups: StartupResult[]
+    total: number
+    totalPages: number
+  }>(`/api/startups?${params.toString()}`, fetcher, { keepPreviousData: true })
+
+  // AI recommended = top matches (fetch page 1 sorted by matchScore)
+  const { data: aiData } = useSWR<{
+    startups: StartupResult[]
+    total: number
+  }>(`/api/startups?sortBy=matchScore&perPage=6&page=1`, fetcher)
+
+  const aiRecommended = useMemo(
+    () => (aiData?.startups || []).filter((s) => s.matchScore >= 50),
+    [aiData]
+  )
 
   const hasActiveFilters = sectorFilter !== "all" || stageFilter !== "all" || locationFilter !== "all"
 
@@ -117,12 +140,11 @@ export default function InvestorDashboard() {
     setSectorFilter("all")
     setStageFilter("all")
     setLocationFilter("all")
+    setPage(1)
   }
 
-  const aiRecommended = useMemo(
-    () => allStartups.filter((s) => s.matchScore >= 85).sort((a, b) => b.matchScore - a.matchScore),
-    [allStartups]
-  )
+  const startups = data?.startups || []
+  const totalPages = data?.totalPages || 1
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -134,7 +156,9 @@ export default function InvestorDashboard() {
           </div>
           <div>
             <h1 className="font-serif text-2xl font-bold text-foreground md:text-3xl">Investor Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Discover AI-recommended startups and filter by your preferences</p>
+            <p className="text-sm text-muted-foreground">
+              Discover AI-recommended startups from 1,500 companies
+            </p>
           </div>
         </div>
       </div>
@@ -146,11 +170,17 @@ export default function InvestorDashboard() {
           <h2 className="font-serif text-xl font-bold text-foreground">AI Recommended for You</h2>
           <Badge variant="secondary" className="text-xs">Top Picks</Badge>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {aiRecommended.map((startup) => (
-            <StartupCard key={startup.id} startup={startup} />
-          ))}
-        </div>
+        {aiRecommended.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {aiRecommended.map((startup) => (
+              <StartupCard key={startup.id} startup={startup} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        )}
       </section>
 
       {/* Filters */}
@@ -161,14 +191,14 @@ export default function InvestorDashboard() {
             Filter Startups
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Narrow down startups by sector, stage, and location
+            Narrow down from {data?.total || "1,500"} startups by sector, stage, and location
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 md:flex-row md:items-end">
             <div className="flex flex-1 flex-col gap-2">
               <label className="text-sm font-medium text-foreground">Sector</label>
-              <Select value={sectorFilter} onValueChange={setSectorFilter}>
+              <Select value={sectorFilter} onValueChange={(v) => { setSectorFilter(v); setPage(1) }}>
                 <SelectTrigger className="border-input bg-background">
                   <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
                   <SelectValue />
@@ -181,7 +211,7 @@ export default function InvestorDashboard() {
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <label className="text-sm font-medium text-foreground">Stage</label>
-              <Select value={stageFilter} onValueChange={setStageFilter}>
+              <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(1) }}>
                 <SelectTrigger className="border-input bg-background">
                   <TrendingUp className="mr-2 h-4 w-4 text-muted-foreground" />
                   <SelectValue />
@@ -194,7 +224,7 @@ export default function InvestorDashboard() {
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <label className="text-sm font-medium text-foreground">Location</label>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <Select value={locationFilter} onValueChange={(v) => { setLocationFilter(v); setPage(1) }}>
                 <SelectTrigger className="border-input bg-background">
                   <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
                   <SelectValue />
@@ -233,13 +263,42 @@ export default function InvestorDashboard() {
       <div className="mb-5 flex items-center justify-between">
         <h2 className="font-serif text-xl font-bold text-foreground">
           All Startups
-          <span className="ml-2 text-base font-normal text-muted-foreground">({filteredStartups.length})</span>
+          <span className="ml-2 text-base font-normal text-muted-foreground">
+            ({data?.total || 0})
+          </span>
         </h2>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      {filteredStartups.length > 0 ? (
+      {isLoading && startups.length === 0 ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : startups.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredStartups.map((startup) => (
+          {startups.map((startup) => (
             <StartupCard key={startup.id} startup={startup} />
           ))}
         </div>
@@ -257,6 +316,33 @@ export default function InvestorDashboard() {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Bottom Pagination */}
+      {totalPages > 1 && startups.length > 0 && (
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            Previous
+          </Button>
+          <span className="px-3 text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
       )}
     </div>
   )

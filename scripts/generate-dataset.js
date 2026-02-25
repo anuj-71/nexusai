@@ -1,7 +1,7 @@
 // Replicates the Python generate-startup-id script logic in Node.js
 // Generates 1500 startups with the same fields and distributions
 
-import { writeFileSync } from "fs";
+import { writeFileSync, mkdirSync } from "fs";
 
 const NUM_STARTUPS = 1500;
 
@@ -81,11 +81,15 @@ for (let i = 1; i <= NUM_STARTUPS; i++) {
   });
 }
 
-// Write as JSON to lib/startup-dataset.json
+// Write JSON to stdout so the framework can capture it
+mkdirSync("/home/user/output", { recursive: true });
 writeFileSync(
-  "/vercel/share/v0-project/lib/startup-dataset.json",
+  "/home/user/output/startup-dataset.json",
   JSON.stringify(data, null, 2)
 );
 
 console.log(`Generated ${data.length} startups successfully.`);
 console.log("Sample:", JSON.stringify(data[0], null, 2));
+console.log("DATASET_JSON_START");
+console.log(JSON.stringify(data));
+console.log("DATASET_JSON_END");
