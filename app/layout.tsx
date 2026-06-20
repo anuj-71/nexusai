@@ -1,42 +1,57 @@
-import type { Metadata, Viewport } from "next"
-import { Inter, Montserrat } from "next/font/google"
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { AuthProvider } from "@/hooks/useAuth"
+import { Analytics } from '@vercel/analytics/next'
+import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import { Toaster } from 'sonner'
+import './globals.css'
 
-const _inter = Inter({ subsets: ["latin"] })
-const _montserrat = Montserrat({ subsets: ["latin"] })
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: "NexusAI - AI-Powered Startup-Investor Matching",
-  description:
-    "Predict startup growth potential and find ideal investor matches with AI-driven insights.",
+  title: 'NexusAI - Connect Startups with Investors',
+  description: 'A platform where startups and investors meet to drive innovation and growth',
+  generator: 'v0.app',
+  icons: {
+    icon: [
+      {
+        url: '/icon-light-32x32.png',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/icon-dark-32x32.png',
+        media: '(prefers-color-scheme: dark)',
+      },
+      {
+        url: '/icon.svg',
+        type: 'image/svg+xml',
+      },
+    ],
+    apple: '/apple-icon.png',
+  },
 }
 
 export const viewport: Viewport = {
+  colorScheme: 'light dark',
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f5fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a2e" },
+    { media: '(prefers-color-scheme: light)', color: 'white' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
   ],
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <Navbar />
-            <main>{children}</main>
-            <Footer />
-          </AuthProvider>
-        </ThemeProvider>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="font-sans antialiased">
+        {children}
+        <Toaster />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
