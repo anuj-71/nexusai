@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Zap, Rocket, TrendingUp, ArrowRight } from "lucide-react"
 
+import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/components/ui/use-toast"
+
 export function AuthForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -17,14 +20,91 @@ export function AuthForm() {
   const [role, setRole] = useState<"startup" | "investor">(initialRole)
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
+  const inFlight = useRef(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const auth = useAuth()
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect based on session/profile changes
+  useEffect(() => {
+    if (auth.loading) return
+    if (!auth.session) return
+
+    // If profile exists, go to dashboard
+    if (auth.profile) {
+      router.push(auth.profile.role === "startup" ? "/startup" : "/investor")
+      return
+    }
+
+    // No profile: redirect to onboarding based on selected role
+    router.push(role === "startup" ? "/startup/onboarding" : "/investor/onboarding")
+  }, [auth.loading, auth.session, auth.profile, role, router])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    if (inFlight.current) return
+    inFlight.current = true
     setLoading(true)
-    setTimeout(() => {
+
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    const email = (formData.get("email") as string) || ""
+    const password = (formData.get("password") as string) || ""
+
+    // Client-side validation
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setErrorMessage("Please enter a valid email address")
       setLoading(false)
-      router.push(role === "startup" ? "/startup" : "/investor")
-    }, 1200)
+      inFlight.current = false
+      return
+    }
+
+    if (!password || password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters")
+      setLoading(false)
+      inFlight.current = false
+      return
+    }
+
+    try {
+      if (isLogin) {
+        const { error } = await auth.signIn(email, password)
+        if (error) {
+          const msg = (error?.message as string) || String(error)
+          setErrorMessage(msg.includes('invalid') || msg.includes('credentials') ? 'Invalid email or password' : msg)
+          toast({ title: 'Sign in failed', description: msg })
+        } else {
+          toast({ title: 'Signed in', description: 'Redirecting to your dashboard' })
+        }
+      } else {
+        const { error } = await auth.signUp(email, password)
+        if (error) {
+          const msg = (error?.message as string) || String(error)
+          // Handle existing email gracefully
+          if (/already/i.test(msg) || /registered/i.test(msg)) {
+            setErrorMessage('An account with this email already exists. Please sign in.')
+            toast({ title: 'Account exists', description: 'Please sign in instead.' })
+          } else {
+            setErrorMessage(msg)
+            toast({ title: 'Sign up failed', description: msg })
+          }
+        } else {
+          setSuccessMessage('Account created. Please check your email for verification instructions.')
+          toast({ title: 'Account created', description: 'Check your email for verification.' })
+        }
+      }
+    } catch (e: any) {
+      const msg = e?.message ?? 'An unexpected error occurred'
+      setErrorMessage(msg)
+      toast({ title: 'Error', description: msg })
+    } finally {
+      setLoading(false)
+      inFlight.current = false
+    }
   }
 
   return (
@@ -85,51 +165,33 @@ export function AuthForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* Name for signup only */}
               {!isLogin && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="name" className="text-foreground">
-                    {role === "startup" ? "Company Name" : "Full Name"}
-                  </Label>
-                  <Input
-                    id="name"
-                    placeholder={role === "startup" ? "Acme Inc." : "John Doe"}
-                    className="border-input bg-background"
-                  />
+                  <Label htmlFor="name" className="text-foreground">{role === "startup" ? "Company Name" : "Full Name"}</Label>
+                  <Input id="name" name="name" placeholder={role === "startup" ? "Acme Inc." : "John Doe"} className="border-input bg-background" />
                 </div>
               )}
+
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email" className="text-foreground">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  className="border-input bg-background"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="password" className="text-foreground">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  className="border-input bg-background"
-                />
+                <Input id="email" name="email" type="email" placeholder="you@example.com" className="border-input bg-background" />
               </div>
 
-              <Button
-                type="submit"
-                className="mt-2 w-full gap-2 bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                ) : (
-                  <>
-                    {isLogin ? "Sign In" : "Create Account"}
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password" className="text-foreground">Password</Label>
+                <div className="relative">
+                  <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="Enter your password" className="border-input bg-background" />
+                  <button type="button" onClick={() => setShowPassword((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{showPassword ? 'Hide' : 'Show'}</button>
+                </div>
+              </div>
+
+              <Button type="submit" className="mt-2 w-full gap-2 bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90" disabled={loading}>
+                {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" /> : <>{isLogin ? 'Sign In' : 'Create Account'} <ArrowRight className="h-4 w-4" /></>}
               </Button>
+
+              {errorMessage && <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</div>}
+              {successMessage && <div className="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{successMessage}</div>}
             </form>
 
             <div className="relative my-6">

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { SECTORS, STAGES, LOCATIONS, type StartupResult } from "@/lib/mock-data"
+import { type StartupResult } from "@/lib/types"
 import {
   ArrowDownUp,
   Brain,
@@ -129,8 +129,10 @@ export default function InvestorDashboard() {
     total: number
   }>(`/api/startups?sortBy=matchScore&perPage=6&page=1`, fetcher)
 
+  const { data: filters } = useSWR(`/api/startups?page=1&perPage=1`, fetcher)
+
   const aiRecommended = useMemo(
-    () => (aiData?.startups || []).filter((s) => s.matchScore >= 50),
+    () => (aiData?.startups || []).filter((s) => (s.matchScore ?? 0) >= 50),
     [aiData]
   )
 
@@ -205,7 +207,7 @@ export default function InvestorDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Sectors</SelectItem>
-                  {SECTORS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {(filters?.filters?.sectors || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -218,7 +220,7 @@ export default function InvestorDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Stages</SelectItem>
-                  {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {(filters?.filters?.stages || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -231,7 +233,7 @@ export default function InvestorDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  {LOCATIONS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  {(filters?.filters?.locations || []).map((l: string) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

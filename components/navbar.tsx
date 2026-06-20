@@ -4,8 +4,11 @@ import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Zap } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 export function Navbar() {
+  const auth = useAuth()
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -16,28 +19,34 @@ export function Navbar() {
           <span className="font-serif text-xl font-bold tracking-tight text-foreground">NexusAI</span>
         </Link>
         <div className="hidden items-center gap-8 md:flex">
-          <Link href="/" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            Home
-          </Link>
-          <Link href="/startup" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            Startups
-          </Link>
-          <Link href="/investor" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            Investors
-          </Link>
+          <Link href="/" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">Home</Link>
+          <Link href="/startup" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">Startups</Link>
+          <Link href="/investor" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">Investors</Link>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link href="/auth">
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              Sign in
-            </Button>
-          </Link>
-          <Link href="/auth">
-            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-              Get Started
-            </Button>
-          </Link>
+          {!auth.user ? (
+            <>
+              <Link href="/auth">
+                <Button variant="ghost" size="sm" className="text-muted-foreground">Sign in</Button>
+              </Link>
+              <Link href="/auth?tab=signup">
+                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href={auth.profile ? (auth.profile.role === 'startup' ? '/startup' : '/investor') : '/profile'}>
+                <Button variant="ghost" size="sm">Dashboard</Button>
+              </Link>
+              <Link href="/profile">
+                <Button variant="ghost" size="sm">Profile</Button>
+              </Link>
+              <Link href="#" onClick={async (e) => { e.preventDefault(); await auth.signOut(); }}>
+                <Button size="sm" className="bg-rose-500 text-white hover:bg-rose-600">Logout</Button>
+              </Link>
+            </>
+          )}
         </div>
       </nav>
     </header>

@@ -8,13 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import {
-  SECTORS,
-  STAGES,
-  LOCATIONS,
-  type PredictionResult,
-  type InvestorMatch,
-} from "@/lib/mock-data"
+import useSWR from "swr"
+import { type PredictionResult, type InvestorMatch } from "@/lib/types"
 import {
   ArrowUpRight,
   Brain,
@@ -108,6 +103,7 @@ export default function StartupDashboard() {
   const [sector, setSector] = useState("")
   const [stage, setStage] = useState("")
   const [location, setLocation] = useState("")
+  const { data: filters } = useSWR(`/api/startups?page=1&perPage=1`, (url: string) => fetch(url).then((r) => r.json()))
   const [fundingNeeded, setFundingNeeded] = useState("")
   const [revenue, setRevenue] = useState("")
   const [growthRate, setGrowthRate] = useState("")
@@ -189,7 +185,7 @@ export default function StartupDashboard() {
                   <Select value={sector} onValueChange={setSector}>
                     <SelectTrigger className="border-input bg-background"><SelectValue placeholder="Select sector" /></SelectTrigger>
                     <SelectContent>
-                      {SECTORS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {(filters?.filters?.sectors || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -198,7 +194,7 @@ export default function StartupDashboard() {
                   <Select value={stage} onValueChange={setStage}>
                     <SelectTrigger className="border-input bg-background"><SelectValue placeholder="Select stage" /></SelectTrigger>
                     <SelectContent>
-                      {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {(filters?.filters?.stages || []).map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -207,7 +203,7 @@ export default function StartupDashboard() {
                   <Select value={location} onValueChange={setLocation}>
                     <SelectTrigger className="border-input bg-background"><SelectValue placeholder="Select location" /></SelectTrigger>
                     <SelectContent>
-                      {LOCATIONS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                      {(filters?.filters?.locations || []).map((l: string) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

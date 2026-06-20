@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { AuthProvider } from "@/hooks/useAuth"
 
 const _inter = Inter({ subsets: ["latin"] })
 const _montserrat = Montserrat({ subsets: ["latin"] })
@@ -30,9 +31,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <Navbar />
-          <main>{children}</main>
-          <Footer />
+          <AuthProvider>
+            <Navbar />
+            <main>{children}</main>
+            <Footer />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
